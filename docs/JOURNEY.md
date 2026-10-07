@@ -14,3 +14,9 @@ Audit of open-headunit, the closest existing head-unit app, against API 15:
 - NDK r17c is the last NDK that can target API < 16.
 
 Decision: don't patch open-headunit down. Write a thin app in plain Java, reuse the protocol knowledge (framing, message types, field numbers) from HeadUnit Revived, decode with Cisco OpenH264 (the phone sends H.264 Constrained Baseline, which it handles) through JNI, draw with a GLES2 YUV shader, and run TLS 1.2 through a Conscrypt `SSLEngine`.
+
+## 2026-10-07 22:20 - Smallest possible app: reports SDK_INT, ABI, display, GL ES version, supported TLS protocols, USB host and accessory features, and whether Conscrypt loads. Also notes how the x86 API 15 emulator is run (KVM, no GPU).
+
+Milestone 0: `probe/`, a throwaway APK that reports SDK_INT, ABI, display size and density, GL ES version, the TLS protocols the platform offers, USB host/accessory features, and whether Conscrypt's native library loads.
+
+Emulator: an x86 API 15 AVD under KVM. There is no usable GPU, and `adb screencap` is blank with host-GPU emulation, so screenshots come from the emulator console instead.
