@@ -20,3 +20,7 @@ Decision: don't patch open-headunit down. Write a thin app in plain Java, reuse 
 Milestone 0: `probe/`, a throwaway APK that reports SDK_INT, ABI, display size and density, GL ES version, the TLS protocols the platform offers, USB host/accessory features, and whether Conscrypt's native library loads.
 
 Emulator: an x86 API 15 AVD under KVM. There is no usable GPU, and `adb screencap` is blank with host-GPU emulation, so screenshots come from the emulator console instead.
+
+## 2026-10-07 23:05 - minSdk 15, plain Java. Transport is the seam between a byte pipe and the AAP link (TCP first). Pb is a tiny hand-rolled protobuf reader/writer instead of a library. Prefs holds the settings; Log15 logs to logcat and to a file.
+
+Milestone 1: the `hu15/` Gradle project. `Transport` is the one interface between a byte pipe and the AAP link; `TcpTransport` is the first implementation (fake phone, Wi-Fi tablets). `Pb` is a hand-rolled protobuf reader/writer (the messages are small and the field numbers come from HeadUnit Revived's .proto files). `Log15` writes to logcat and to `hu15.log`, because the target has no adb and the file is the product.
