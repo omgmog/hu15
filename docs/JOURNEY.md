@@ -24,3 +24,9 @@ Emulator: an x86 API 15 AVD under KVM. There is no usable GPU, and `adb screenca
 ## 2026-10-07 23:05 - minSdk 15, plain Java. Transport is the seam between a byte pipe and the AAP link (TCP first). Pb is a tiny hand-rolled protobuf reader/writer instead of a library. Prefs holds the settings; Log15 logs to logcat and to a file.
 
 Milestone 1: the `hu15/` Gradle project. `Transport` is the one interface between a byte pipe and the AAP link; `TcpTransport` is the first implementation (fake phone, Wi-Fi tablets). `Pb` is a hand-rolled protobuf reader/writer (the messages are small and the field numbers come from HeadUnit Revived's .proto files). `Log15` writes to logcat and to `hu15.log`, because the target has no adb and the file is the product.
+
+## 2026-10-07 23:50 - Frame format [chan][flags][len][type], version exchange, and the TLS client handshake tunnelled in type-3 frames through a Conscrypt SSLEngine, using HeadUnit Revived's reference certificate and key. TLS records must reach the wire in encryption order, so wrap and write share a lock.
+
+AAP link: frames are `[chan][flags][len][type]`; the version exchange comes first; the TLS handshake is carried in type-3 frames and run by a Conscrypt `SSLEngine` as the client, with the reference certificate and key from HeadUnit Revived. The head unit sends AuthComplete once TLS is up.
+
+Bug found while testing: TLS records must hit the wire in the order they were encrypted, or the peer reports a bad record MAC. Wrap and write now share one lock (touch, acks and mic will all send from different threads).
