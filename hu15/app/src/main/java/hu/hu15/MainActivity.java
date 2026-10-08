@@ -39,7 +39,7 @@ public class MainActivity extends Activity {
         String tcpHost = getIntent().getStringExtra("tcp"); // am start -n hu.hu15/.MainActivity --es tcp 10.0.2.2
         if (tcpHost != null) connectTcp(tcpHost, 5277);
         boolean auto = Prefs.get(this, Prefs.AUTO_USB);
-        // Connect when asked (extra) or simply on start (auto-connect on).
+        // Connect when asked (extra), when a USB device was plugged in, when the unit relaunched us, or simply on start (auto-connect on).
         if (getIntent().hasExtra("usb") || (auto && tcpHost == null && Pipe.current == null)) connectUsb(); // am start ... --es usb 1
     }
 
@@ -98,10 +98,20 @@ public class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent i) {
         super.onNewIntent(i);
         setIntent(i);
-        if ((UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(i.getAction())) && Prefs.get(this, Prefs.AUTO_USB) && Pipe.current == null) connectUsb();
+        if ((UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(i.getAction()) || i.hasExtra("reconnect")) && Prefs.get(this, Prefs.AUTO_USB) && Pipe.current == null) connectUsb();
     }
 
     private static volatile boolean connecting;
+    private static int reconnectTries;                               // consecutive link losses; reset after a session that lasted a minute
+    private final android.os.Handler handler = new android.os.Handler();
+
+    /** Retry the USB connection a few times after the link broke by itself (not after a deliberate leave). */
+    private void scheduleReconnect() {
+        if (!Prefs.get(this, Prefs.AUTO_USB) || reconnectTries >= 5) { if (reconnectTries >= 5) log("giving up reconnecting after 5 tries; replug the phone or tap Connect USB"); return; }
+        reconnectTries++;
+        log("link lost: reconnecting in 3 s (try " + reconnectTries + " of 5)");
+        handler.postDelayed(new Runnable() { @Override public void run() { if (Pipe.current == null) connectUsb(); } }, 3000);
+    }
 
     private void connectUsb() {
         if (connecting) { log("already connecting"); return; }
@@ -171,6 +181,7 @@ public class MainActivity extends Activity {
             if (cfg.btAddress == null) cfg.btAddress = getIntent().getStringExtra("btaddr"); // test hook for devices without a BT adapter
             log("bluetooth address: " + cfg.btAddress);
         }
+        final long startMs = System.currentTimeMillis();
         final Session session = new Session(link, pipe, cfg);
         pipe.session = session;
         Pipe.current = pipe;
@@ -188,6 +199,11 @@ public class MainActivity extends Activity {
             if (cl.isHeld()) cl.release();
         }
         log("session ended; " + pipe.stats);
+        if (t instanceof UsbTransport) {
+            if (System.currentTimeMillis() - startMs > 60000) reconnectTries = 0;   // a healthy session earns a fresh set of tries
+            if (session.linkLost) runOnUiThread(new Runnable() { @Override public void run() { scheduleReconnect(); } });
+            else reconnectTries = 0;
+        }
     }
 
     private void log(final String s) {
