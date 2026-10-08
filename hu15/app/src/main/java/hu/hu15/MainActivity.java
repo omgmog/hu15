@@ -76,12 +76,13 @@ public class MainActivity extends Activity {
         } }).start();
     }
 
-    /** Handshake, then the full session on this thread, logging what the phone sends (no video or audio output yet). */
+    /** Handshake, then the full session on this thread until the phone leaves or the link breaks. */
     private void runSession(Transport t) throws Exception {
         AapLink link = new AapLink(this, t);
         link.connect();
         log("TLS up; session running");
         if (t instanceof TcpTransport) ((TcpTransport) t).setReadTimeoutMs(0);          // phone pings regularly in real use; tests may idle
+        Pipe pipe = new Pipe(Prefs.get(this, Prefs.THREADS2) ? 2 : 1);
         Session.Config cfg = new Session.Config();
         cfg.mic = Prefs.get(this, Prefs.MIC);
         cfg.rhd = Prefs.get(this, Prefs.RHD);
@@ -92,15 +93,23 @@ public class MainActivity extends Activity {
             if (cfg.btAddress == null) cfg.btAddress = getIntent().getStringExtra("btaddr"); // test hook for devices without a BT adapter
             log("bluetooth address: " + cfg.btAddress);
         }
-        final int[] n = new int[2];
-        new Session(link, new Session.Sink() {
-            @Override public void videoConfig(byte[] d, int off, int len) { log("video config, " + len + " B"); }
-            @Override public void videoFrame(byte[] d, int off, int len) { if (n[0]++ % 100 == 0) log("video frame " + n[0] + ", " + len + " B"); }
-            @Override public void audioStart(int chan, int rate, int bits, int channels) { log("audio start ch" + chan + " " + rate + " Hz x" + channels); }
-            @Override public void audioPcm(int chan, byte[] d, int off, int len) { n[1] += len; }
-            @Override public void audioStop(int chan) { log("audio stop ch" + chan + ", " + n[1] + " B"); }
-            @Override public void ended(String why) { log("session ended: " + why); }
-        }, cfg).run();
+        final Session session = new Session(link, pipe, cfg);
+        pipe.session = session;
+        Pipe.current = pipe;
+        startActivity(new Intent(this, ProjectionActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        // Keep the Wi-Fi radio and the CPU awake for the whole session; tablets otherwise doze the radio and drop the link.
+        android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) getSystemService(WIFI_SERVICE);
+        android.net.wifi.WifiManager.WifiLock wl = wm == null ? null : wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "hu15");
+        android.os.PowerManager.WakeLock cl = ((android.os.PowerManager) getSystemService(POWER_SERVICE)).newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "hu15");
+        try {
+            if (wl != null) wl.acquire();
+            cl.acquire();
+            session.run();
+        } finally {
+            if (wl != null && wl.isHeld()) wl.release();
+            if (cl.isHeld()) cl.release();
+        }
+        log("session ended; " + pipe.stats);
     }
 
     private void log(final String s) {
@@ -124,6 +133,7 @@ public class MainActivity extends Activity {
             getSharedPreferences("hu15", MODE_PRIVATE).edit().putString("tcp_host", h).commit();
             connectTcp(h, 5277);
         } });
+        button(root, "Settings", new Runnable() { public void run() { startActivity(new Intent(MainActivity.this, SettingsActivity.class)); } });
         out = new TextView(this);
         out.setTextSize(11);
         out.setTypeface(android.graphics.Typeface.MONOSPACE);

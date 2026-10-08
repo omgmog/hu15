@@ -46,3 +46,7 @@ x86 has no assembler here (no nasm), so that build is emulator-only; ICS Dalvik 
 ## 2026-10-08 15:35 - Pipe is the Session sink: it decodes video under the view's lock so GL never uploads a half-written picture, and starts one PcmPlayer per audio channel. PcmPlayer feeds an AudioTrack from a bounded queue so a slow audio sink can never stall the session's read loop.
 
 `Pipe` implements `Session.Sink`: video goes through the OpenH264 decoder into the attached `YuvView`; each audio channel gets a `PcmPlayer`, an `AudioTrack` fed from a bounded queue (about 2.4 s; the oldest chunk is dropped when full) so a slow sink cannot stall the read loop. Decode runs under the view's lock so GL cannot upload a picture that is still being written.
+
+## 2026-10-08 17:20 - Touches are mapped from the letterboxed video rect to 800x480 phone coordinates. Back tap = Back on the phone, hold = leave projection; Menu or a top-right corner hold also leave. Settings (mic, Bluetooth, right-hand drive, night mode, nav bar) are plain widgets. MainActivity now runs a session through Pipe and opens the projection screen.
+
+`ProjectionActivity` shows the picture and forwards touches (multi-touch, mapped through the letterbox rect) and keys. Back is tapped through to the phone, held for a second it leaves projection; Menu, or holding the top-right corner for 1.5 s, also leaves, for units with no Back key. `SettingsActivity` is plain widgets (no AppCompat on API 15). Changes apply to the next connection.
