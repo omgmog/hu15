@@ -64,3 +64,11 @@ Findings:
 Milestone: hu15 on the tablet against the real phone: video, touch and audio all work.
 
 Tools: `scripts/emushot.sh` (host-side emulator screenshots), `scripts/mtouch.sh` (in-app touch through monkey; `sendevent` swipes only reach the status bar), `scripts/swipe.sh`.
+
+## 2026-10-08 20:25 - Notes on what the target is and how apps get onto it, plus a read of OpenDroidAuto's USB and Honda integration to learn from.
+
+Honda CONNECT, from public sources: NVIDIA Tegra (3), Android 4.0.4 with a Honda skin, 7" 800x480, small storage, Garmin navigation competing for RAM.
+
+Apps can only be installed and run through the unit's lock-down: an installer whitelist (`allowed_installations.list`) and a runnable-process whitelist (`process_controls.list`), both edited by a community "Honda Permissions" app.
+
+Prior art: OpenDroidAuto (GPL-3.0, C++/aasdk, runs over USB on Honda CONNECT per forum users, steering wheel buttons through Honda's steering service which needs `android.permission.ADA_SERVICE_ACCESS`, hardware decode through OMX). Read for its USB handling: AOA is done in Java (`UsbDeviceConnection.controlTransfer`), 10 s transfer timeouts, NUL-terminated strings. Its source is GPL-3.0, which can be combined into an AGPL-3.0 work.
