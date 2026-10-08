@@ -50,3 +50,17 @@ x86 has no assembler here (no nasm), so that build is emulator-only; ICS Dalvik 
 ## 2026-10-08 17:20 - Touches are mapped from the letterboxed video rect to 800x480 phone coordinates. Back tap = Back on the phone, hold = leave projection; Menu or a top-right corner hold also leave. Settings (mic, Bluetooth, right-hand drive, night mode, nav bar) are plain widgets. MainActivity now runs a session through Pipe and opens the projection screen.
 
 `ProjectionActivity` shows the picture and forwards touches (multi-touch, mapped through the letterbox rect) and keys. Back is tapped through to the phone, held for a second it leaves projection; Menu, or holding the top-right corner for 1.5 s, also leaves, for units with no Back key. `SettingsActivity` is plain widgets (no AppCompat on API 15). Changes apply to the next connection.
+
+## 2026-10-08 19:10 - A real Android Auto build (17.9, on an Android 14 emulator image) served as the phone through its developer head-unit server. hu_client.py is a scripted head unit for poking it; relay.py lets a tablet reach the adb-forwarded port. Findings from the real phone: it hangs up about 5 s after TLS without AuthComplete, and it only keeps going if a mic service is announced or vehicle_type says 'motorcycle'.
+
+First real Android Auto phone: Android Auto 17.9 on an Android 14 Google Play emulator image, with the developer option "Start head unit server" on :5277. `scripts/hu_client.py` is a scripted head unit used to see exactly what the phone asks for; `scripts/relay.py` is a time-boxed TCP relay so a tablet on the LAN can reach the adb-forwarded port.
+
+Findings:
+
+- The phone speaks AAP 1.7 and hangs up about 5 s after TLS if the head unit never sends AuthComplete.
+- Android Auto 17.9 closes the connection (`startRequiredServices failed`) unless the service discovery response announces a microphone service, or sets `vehicle_type` to motorcycle (3), which makes the phone use its own mic. hu15 announces vehicle_type 3 unless the unit-mic option is on.
+- Video is H.264 Constrained Baseline 800x480 level 3.1, exactly what OpenH264 handles; about 17 ms per frame on the ARM tablet.
+
+Milestone: hu15 on the tablet against the real phone: video, touch and audio all work.
+
+Tools: `scripts/emushot.sh` (host-side emulator screenshots), `scripts/mtouch.sh` (in-app touch through monkey; `sendevent` swipes only reach the status bar), `scripts/swipe.sh`.

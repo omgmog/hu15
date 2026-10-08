@@ -330,7 +330,7 @@ public final class Session implements Runnable {
         r.raw(s);
         r.str(2, "Honda").str(3, "HR-V").str(4, "2018").str(5, "hu15-0001").varint(6, cfg.rhd ? 1 : 0)
          .str(7, "hu15").str(8, "hu15").str(9, "1").str(10, "0.1.0").bool(11, false).bool(12, false).varint(13, 0).str(14, "hu15")
-         .msg(17, new Pb().str(1, "Honda").str(2, "HR-V").str(3, "2018").str(4, "hu15-0001").str(5, "hu15").str(6, "hu15").str(7, "1").str(8, "0.1.0"));
+         .msg(17, new Pb().str(1, "Honda").str(2, "HR-V").str(3, "2018").str(4, "hu15-0001").str(5, "hu15").str(6, "hu15").str(7, "1").str(8, "0.1.0").varint(9, cfg.mic ? 1 : 3)); // vehicle_type: real Android Auto 17.9 hangs up unless a mic service exists OR the vehicle is a motorcycle (3 = phone uses its own mic)
         return r.build();
     }
 

@@ -56,7 +56,7 @@ public final class AapLink {
         Log15.i(TAG, "phone speaks AAP " + (((v.payload[0] & 255) << 8) | (v.payload[1] & 255)) + "." + (((v.payload[2] & 255) << 8) | (v.payload[3] & 255))
                 + " status=" + (((v.payload[4] & 255) << 8) | (v.payload[5] & 255)));
         handshake();
-        // The CAR sends AuthComplete (status 0) once TLS is up; the phone waits for it.
+        // The CAR sends AuthComplete (status 0) once TLS is up; the phone waits for it and hangs up after ~5 s without (seen with real Android Auto 17.9).
         sendPlain(0, 3, 4, new byte[]{8, 0});
         Log15.i(TAG, "sent AuthComplete");
     }
