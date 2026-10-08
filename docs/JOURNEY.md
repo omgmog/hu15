@@ -42,3 +42,7 @@ Verified on the API 15 x86 emulator: version exchange, TLS 1.2 via Conscrypt, di
 Milestone 3b: video. OpenH264 v2.4.1 is built as a static library with NDK r17c (`native/build_openh264.sh`), linked into `libhu15n.so` with a small JNI layer (`native/jni/hu15n.cpp`) that decodes into a direct `ByteBuffer`. `YuvView` uploads the three planes as luminance textures and a fragment shader does the YUV to RGB conversion, letterboxed so the 800x480 picture is never stretched. `scripts/check_api15_syms.sh` checks that the library imports nothing API 15's libc lacks.
 
 x86 has no assembler here (no nasm), so that build is emulator-only; ICS Dalvik also calls JNI with a 4-byte aligned stack on x86, hence `-mstackrealign`.
+
+## 2026-10-08 15:35 - Pipe is the Session sink: it decodes video under the view's lock so GL never uploads a half-written picture, and starts one PcmPlayer per audio channel. PcmPlayer feeds an AudioTrack from a bounded queue so a slow audio sink can never stall the session's read loop.
+
+`Pipe` implements `Session.Sink`: video goes through the OpenH264 decoder into the attached `YuvView`; each audio channel gets a `PcmPlayer`, an `AudioTrack` fed from a bounded queue (about 2.4 s; the oldest chunk is dropped when full) so a slow sink cannot stall the read loop. Decode runs under the view's lock so GL cannot upload a picture that is still being written.
