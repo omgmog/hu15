@@ -36,3 +36,9 @@ Bug found while testing: TLS records must hit the wire in the order they were en
 Milestones 2-3a. `Session` answers version/auth, service discovery, channel open, sensors, input binding, pings, nav and audio focus, and acks media. `scripts/fake_phone.py` plays a phone: service discovery, six channel opens, sensor/input/ping/focus traffic and an 800x480 H.264 test stream. `MainActivity` is a debug screen with a TLS self-test and a TCP connect that logs what arrives.
 
 Verified on the API 15 x86 emulator: version exchange, TLS 1.2 via Conscrypt, discovery, channel opens, sensor start, and acked media.
+
+## 2026-10-08 13:55 - OpenH264 is built statically with NDK r17c for armeabi-v7a (NEON) and x86 (no asm) and called through a small JNI layer that returns I420 in a direct ByteBuffer. A GLES2 shader converts YUV to RGB, letterboxed to the 800x480 aspect. check_api15_syms.sh lists any symbol the .so imports that API 15's libc does not have. OpenH264's source is not vendored; the built libraries are committed so the app builds without an NDK.
+
+Milestone 3b: video. OpenH264 v2.4.1 is built as a static library with NDK r17c (`native/build_openh264.sh`), linked into `libhu15n.so` with a small JNI layer (`native/jni/hu15n.cpp`) that decodes into a direct `ByteBuffer`. `YuvView` uploads the three planes as luminance textures and a fragment shader does the YUV to RGB conversion, letterboxed so the 800x480 picture is never stretched. `scripts/check_api15_syms.sh` checks that the library imports nothing API 15's libc lacks.
+
+x86 has no assembler here (no nasm), so that build is emulator-only; ICS Dalvik also calls JNI with a 4-byte aligned stack on x86, hence `-mstackrealign`.

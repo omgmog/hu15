@@ -7,4 +7,7 @@ The embedded reference certificate and key (hu15/app/src/main/res/raw/cert, priv
 
 Bundled / linked:
 - Conscrypt 2.5.3 (Google), Apache-2.0, TLS 1.2 provider (platform TLS on API 15 stops at TLS 1.0).
+- OpenH264 v2.4.1 (Cisco), BSD-2-Clause, statically linked into libhu15n.so (source expected in native-src/openh264, built by native/build_openh264.sh).
+  Cisco's patent licence covers only Cisco's own binaries; a self-built H.264 decoder has no patent cover. Personal use here; check before distributing.
+- NDK r17c libc++ (Apache-2.0 with LLVM exception).
 Not used: HeadUnit Revived's code, gartnera/headunit (AGPL C++), FFmpeg.
