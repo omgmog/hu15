@@ -38,6 +38,9 @@ public class MainActivity extends Activity {
         selfTest();
         String tcpHost = getIntent().getStringExtra("tcp"); // am start -n hu.hu15/.MainActivity --es tcp 10.0.2.2
         if (tcpHost != null) connectTcp(tcpHost, 5277);
+        boolean auto = Prefs.get(this, Prefs.AUTO_USB);
+        // Connect when asked (extra) or simply on start (auto-connect on).
+        if (getIntent().hasExtra("usb") || (auto && tcpHost == null && Pipe.current == null)) connectUsb(); // am start ... --es usb 1
     }
 
     private void say(String s) { Log15.i("selftest", s); out.append(s + "\n"); }
@@ -62,6 +65,20 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * Phone-hotspot mode, no Bluetooth: join the phone's hotspot in Android's Wi-Fi settings, switch on Android Auto's
+     * developer "Start head unit server" on the phone, then this connects to the hotspot gateway (= the phone) on :5277.
+     */
+    private void connectHotspot() {
+        android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) getSystemService(WIFI_SERVICE);
+        android.net.DhcpInfo d = wm == null ? null : wm.getDhcpInfo();
+        int gw = d == null ? 0 : d.gateway; // little-endian IPv4
+        if (gw == 0) { log("not connected to a Wi-Fi network (join the phone's hotspot first)"); return; }
+        String ip = (gw & 255) + "." + ((gw >> 8) & 255) + "." + ((gw >> 16) & 255) + "." + ((gw >> 24) & 255);
+        log("Wi-Fi gateway " + ip + " (the phone, if this is its hotspot)");
+        connectTcp(ip, 5277);
+    }
+
     private void connectTcp(final String host, final int port) {
         new Thread(new Runnable() { @Override public void run() {
             try {
@@ -76,12 +93,73 @@ public class MainActivity extends Activity {
         } }).start();
     }
 
+    private static final String ACTION_USB_PERMISSION = "hu.hu15.USB_PERMISSION";
+
+    @Override protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        setIntent(i);
+        if ((UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(i.getAction())) && Prefs.get(this, Prefs.AUTO_USB) && Pipe.current == null) connectUsb();
+    }
+
+    private static volatile boolean connecting;
+
+    private void connectUsb() {
+        if (connecting) { log("already connecting"); return; }
+        connecting = true;
+        final UsbManager um = (UsbManager) getSystemService(USB_SERVICE);
+        new Thread(new Runnable() { @Override public void run() {
+            try {
+                java.util.Map<String, UsbDevice> devs = um.getDeviceList();
+                log("USB devices: " + devs.size());
+                for (UsbDevice d : devs.values()) log("  " + UsbTransport.describe(d));
+                UsbDevice acc = UsbTransport.findAccessory(um);
+                if (acc == null) {
+                    UsbDevice phone = null;
+                    for (UsbDevice d : devs.values()) if (d.getDeviceClass() != 9 && d.getVendorId() != 0x1d6b) { phone = d; break; } // first device that is not a hub
+                    if (phone == null) { log("RESULT 2b: FAIL no USB device to switch"); return; }
+                    if (!um.hasPermission(phone)) {
+                        log("requesting USB permission for " + phone.getDeviceName() + " (tap OK on the dialog)");
+                        requestPermission(um, phone);
+                        if (!um.hasPermission(phone)) { log("permission denied/timeout"); return; }
+                    }
+                    log("switching " + phone.getDeviceName() + " to accessory mode");
+                    if (!UsbTransport.switchToAccessory(um, phone)) { log("RESULT 2b: FAIL not an AOA device"); return; }
+                    for (int i = 0; i < 6 && acc == null; i++) { Thread.sleep(500); acc = UsbTransport.findAccessory(um); }
+                    if (acc == null) { log("RESULT 2b: FAIL phone did not re-appear as accessory (18d1:2d0x)"); return; }
+                }
+                log("accessory device: " + UsbTransport.describe(acc));
+                if (!um.hasPermission(acc)) { requestPermission(um, acc); }
+                if (!um.hasPermission(acc)) { log("RESULT 2b: FAIL no permission for accessory device"); return; }
+                Transport t = new UsbTransport(um, acc);
+                runSession(t);
+                t.close();
+            } catch (Throwable e) {
+                Log15.e("m2b", "usb link failed", e);
+                log("RESULT 2b: FAIL " + e);
+            } finally {
+                connecting = false;
+            }
+        } }).start();
+    }
+
+    private void requestPermission(UsbManager um, final UsbDevice d) throws InterruptedException {
+        final Object lock = new Object();
+        BroadcastReceiver rx = new BroadcastReceiver() {
+            @Override public void onReceive(Context c, Intent i) { synchronized (lock) { lock.notifyAll(); } }
+        };
+        registerReceiver(rx, new IntentFilter(ACTION_USB_PERMISSION));
+        um.requestPermission(d, PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0));
+        synchronized (lock) { lock.wait(30000); }
+        unregisterReceiver(rx);
+    }
+
     /** Handshake, then the full session on this thread until the phone leaves or the link breaks. */
     private void runSession(Transport t) throws Exception {
         AapLink link = new AapLink(this, t);
         link.connect();
         log("TLS up; session running");
         if (t instanceof TcpTransport) ((TcpTransport) t).setReadTimeoutMs(0);          // phone pings regularly in real use; tests may idle
+        if (t instanceof UsbTransport) ((UsbTransport) t).setReadDeadlineMs(60000);
         Pipe pipe = new Pipe(Prefs.get(this, Prefs.THREADS2) ? 2 : 1);
         Session.Config cfg = new Session.Config();
         cfg.mic = Prefs.get(this, Prefs.MIC);
@@ -133,6 +211,8 @@ public class MainActivity extends Activity {
             getSharedPreferences("hu15", MODE_PRIVATE).edit().putString("tcp_host", h).commit();
             connectTcp(h, 5277);
         } });
+        button(root, "Connect USB phone", new Runnable() { public void run() { connectUsb(); } });
+        button(root, "Phone hotspot", new Runnable() { public void run() { connectHotspot(); } });
         button(root, "Settings", new Runnable() { public void run() { startActivity(new Intent(MainActivity.this, SettingsActivity.class)); } });
         out = new TextView(this);
         out.setTextSize(11);

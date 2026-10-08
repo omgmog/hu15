@@ -72,3 +72,7 @@ Honda CONNECT, from public sources: NVIDIA Tegra (3), Android 4.0.4 with a Honda
 Apps can only be installed and run through the unit's lock-down: an installer whitelist (`allowed_installations.list`) and a runnable-process whitelist (`process_controls.list`), both edited by a community "Honda Permissions" app.
 
 Prior art: OpenDroidAuto (GPL-3.0, C++/aasdk, runs over USB on Honda CONNECT per forum users, steering wheel buttons through Honda's steering service which needs `android.permission.ADA_SERVICE_ACCESS`, hardware decode through OMX). Read for its USB handling: AOA is done in Java (`UsbDeviceConnection.controlTransfer`), 10 s transfer timeouts, NUL-terminated strings. Its source is GPL-3.0, which can be combined into an AGPL-3.0 work.
+
+## 2026-10-08 22:05 - AOA control requests 51 (get protocol), 52 (send strings) and 53 (start), then bulk transfers on the accessory interface through UsbDeviceConnection (API 12 calls only; the offset variant of bulkTransfer is API 18). The phone re-enumerates as 18d1:2d0x.
+
+USB: `UsbTransport` sends the AOA handshake (51 GET_PROTOCOL, 52 SEND_STRING x6, 53 START), waits for the phone to re-enumerate as `18d1:2d0x`, claims the interface and reads/writes its two bulk endpoints. Only API 12 calls are used, so `bulkTransfer` has no offset form and writes go through a copy. 10 s bulk timeouts as OpenDroidAuto uses; a short timeout can make Linux drop data already received for that transfer. `MainActivity` gets "Connect USB phone" and "Phone hotspot", and reacts to `USB_DEVICE_ATTACHED`.
