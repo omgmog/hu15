@@ -30,3 +30,9 @@ Milestone 1: the `hu15/` Gradle project. `Transport` is the one interface betwee
 AAP link: frames are `[chan][flags][len][type]`; the version exchange comes first; the TLS handshake is carried in type-3 frames and run by a Conscrypt `SSLEngine` as the client, with the reference certificate and key from HeadUnit Revived. The head unit sends AuthComplete once TLS is up.
 
 Bug found while testing: TLS records must hit the wire in the order they were encrypted, or the peer reports a bad record MAC. Wrap and write now share one lock (touch, acks and mic will all send from different threads).
+
+## 2026-10-08 10:40 - Session answers the phone's control traffic, opens the announced channels, acks media and hands payloads to a Sink. scripts/fake_phone.py plays a phone so the protocol can be tested on the emulator with no phone. MainActivity is a debug screen: self-test and a TCP connect with a logging sink.
+
+Milestones 2-3a. `Session` answers version/auth, service discovery, channel open, sensors, input binding, pings, nav and audio focus, and acks media. `scripts/fake_phone.py` plays a phone: service discovery, six channel opens, sensor/input/ping/focus traffic and an 800x480 H.264 test stream. `MainActivity` is a debug screen with a TLS self-test and a TCP connect that logs what arrives.
+
+Verified on the API 15 x86 emulator: version exchange, TLS 1.2 via Conscrypt, discovery, channel opens, sensor start, and acked media.
