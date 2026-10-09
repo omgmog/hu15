@@ -9,6 +9,7 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-feature android:name="android.hardware.usb.accessory" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-permission android:name="android.permission.ADA_SERVICE_ACCESS" />
     <application android:label="HU15" android:theme="@android:style/Theme.Holo.NoActionBar" android:allowBackup="false">
         <activity android:name=".ProjectionActivity" android:screenOrientation="landscape" android:configChanges="orientation|keyboardHidden|screenSize" android:launchMode="singleTask" />
         <receiver android:name=".MediaButtonReceiver" android:exported="true">

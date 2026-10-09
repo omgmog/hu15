@@ -88,6 +88,8 @@ public class ProjectionActivity extends Activity {
         if (hasFocus) hideBars();
     }
 
+    private WheelKeys wheel;
+
     private boolean key(int code, boolean down) {
         Log15.i("key", (down ? "down " : "up ") + code + " " + KeyEvent.keyCodeToString(code));
         Pipe p = Pipe.current;
@@ -105,6 +107,13 @@ public class ProjectionActivity extends Activity {
             }
             return true;
         }
+        // Honda wheel keys arrive as odd negative codes (same ones OpenDroidAuto maps): left/right = previous/next, source = play/pause (+/- = up/down)
+        if (code == -65532) code = KeyEvent.KEYCODE_MEDIA_PREVIOUS;
+        else if (code == -65533) code = KeyEvent.KEYCODE_MEDIA_NEXT;
+        else if (code == -65531) code = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
+        else if (code == -65535) code = KeyEvent.KEYCODE_DPAD_UP;
+        else if (code == -65534) code = KeyEvent.KEYCODE_DPAD_DOWN;
+
         switch (code) {
             case KeyEvent.KEYCODE_BACK: case KeyEvent.KEYCODE_DPAD_UP: case KeyEvent.KEYCODE_DPAD_DOWN: case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT: case KeyEvent.KEYCODE_DPAD_CENTER: case KeyEvent.KEYCODE_ENTER:
@@ -123,6 +132,8 @@ public class ProjectionActivity extends Activity {
     @Override public boolean onKeyUp(int code, KeyEvent e) { return key(code, false) || super.onKeyUp(code, e); }
 
     @Override protected void onResume() { super.onResume(); if (view == null) return; Pipe p = Pipe.current; if (p != null) p.attach(view); else Pipe.view = view; view.onResume();
+        if (wheel == null) wheel = new WheelKeys(this);
+        wheel.start();
         ((android.media.AudioManager) getSystemService(AUDIO_SERVICE)).registerMediaButtonEventReceiver(new android.content.ComponentName(this, MediaButtonReceiver.class)); }
-    @Override protected void onPause() { ((android.media.AudioManager) getSystemService(AUDIO_SERVICE)).unregisterMediaButtonEventReceiver(new android.content.ComponentName(this, MediaButtonReceiver.class)); Pipe.view = null; if (view != null) view.onPause(); super.onPause(); }
+    @Override protected void onPause() { if (wheel != null) wheel.stop(); ((android.media.AudioManager) getSystemService(AUDIO_SERVICE)).unregisterMediaButtonEventReceiver(new android.content.ComponentName(this, MediaButtonReceiver.class)); Pipe.view = null; if (view != null) view.onPause(); super.onPause(); }
 }
