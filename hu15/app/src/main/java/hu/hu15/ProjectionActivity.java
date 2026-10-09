@@ -122,6 +122,7 @@ public class ProjectionActivity extends Activity {
     }
     @Override public boolean onKeyUp(int code, KeyEvent e) { return key(code, false) || super.onKeyUp(code, e); }
 
-    @Override protected void onResume() { super.onResume(); if (view == null) return; Pipe p = Pipe.current; if (p != null) p.attach(view); else Pipe.view = view; view.onResume(); }
-    @Override protected void onPause() { Pipe.view = null; if (view != null) view.onPause(); super.onPause(); }
+    @Override protected void onResume() { super.onResume(); if (view == null) return; Pipe p = Pipe.current; if (p != null) p.attach(view); else Pipe.view = view; view.onResume();
+        ((android.media.AudioManager) getSystemService(AUDIO_SERVICE)).registerMediaButtonEventReceiver(new android.content.ComponentName(this, MediaButtonReceiver.class)); }
+    @Override protected void onPause() { ((android.media.AudioManager) getSystemService(AUDIO_SERVICE)).unregisterMediaButtonEventReceiver(new android.content.ComponentName(this, MediaButtonReceiver.class)); Pipe.view = null; if (view != null) view.onPause(); super.onPause(); }
 }

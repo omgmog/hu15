@@ -11,6 +11,9 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <application android:label="HU15" android:theme="@android:style/Theme.Holo.NoActionBar" android:allowBackup="false">
         <activity android:name=".ProjectionActivity" android:screenOrientation="landscape" android:configChanges="orientation|keyboardHidden|screenSize" android:launchMode="singleTask" />
+        <receiver android:name=".MediaButtonReceiver" android:exported="true">
+            <intent-filter android:priority="1000"><action android:name="android.intent.action.MEDIA_BUTTON" /></intent-filter>
+        </receiver>
         <activity android:name=".SettingsActivity" android:screenOrientation="landscape" />
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:screenOrientation="landscape">
             <intent-filter>

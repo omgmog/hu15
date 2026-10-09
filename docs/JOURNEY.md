@@ -84,3 +84,7 @@ m4p. Link lost (read error or EOF, not a bye-bye from either side): retry the US
 ## 2026-10-09 09:05 - The unit has no file manager and no adb. 'Copy log to USB stick' writes hu15.log to the first writable removable mount under /storage or /mnt.
 
 m4q. The first drive happened on m4p: audio fine; no skip buttons; the map video was heavily compressed during full-screen map updates; music and picture stopped after a couple of minutes. We could not get the log off the unit, which has no file picker, so there is now "Copy log to USB stick" (Advanced screen): it tries every removable-looking mount and writes `hu15-MMDD-HHMM.log` to the first one that takes it.
+
+## 2026-10-09 11:20 - Skip buttons on the wheel did nothing while the on-screen ones worked, so the wheel keys do not reach the app as ordinary key events. Register a MEDIA_BUTTON receiver while projecting, log what arrives and forward it to the phone.
+
+m4r. Wheel skip buttons did nothing while the on-screen ones worked. First attempt: handle `KEYCODE_MEDIA_*` in `ProjectionActivity`, and add a `MEDIA_BUTTON` broadcast receiver (registered with `AudioManager` while projecting) that logs every broadcast and forwards the key to the phone.
