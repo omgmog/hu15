@@ -3,6 +3,7 @@
 #include <jni.h>
 #include <android/log.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include "codec_api.h"
 
 #define LOG(...) __android_log_print(ANDROID_LOG_INFO, "hu15n", __VA_ARGS__)
@@ -59,6 +60,9 @@ JNIEXPORT jint JNICALL Java_hu_hu15_H264Decoder_nDecode(JNIEnv* env, jclass, jlo
   env->SetIntArrayRegion(info, 0, 2, wh);
   return 1;
 }
+
+// USBDEVFS_RESET (_IO('U', 20)): re-enumerate the device, like unplugging it. Used to drop a stale AOA session.
+JNIEXPORT jint JNICALL Java_hu_hu15_UsbTransport_nReset(JNIEnv*, jclass, jint fd) { return ioctl(fd, _IO('U', 20), 0); }
 
 JNIEXPORT void JNICALL Java_hu_hu15_H264Decoder_nFree(JNIEnv*, jclass, jlong h) {
   ISVCDecoder* d = (ISVCDecoder*)(intptr_t)h;

@@ -157,19 +157,38 @@ public class MainActivity extends Activity {
                 log("USB devices: " + devs.size());
                 for (UsbDevice d : devs.values()) log("  " + UsbTransport.describe(d));
                 UsbDevice acc = UsbTransport.findAccessory(um);
-                if (acc == null) {
-                    UsbDevice phone = null;
-                    for (UsbDevice d : devs.values()) if (d.getDeviceClass() != 9 && d.getVendorId() != 0x1d6b) { phone = d; break; } // first device that is not a hub
-                    if (phone == null) { log("RESULT 2b: FAIL no USB device to switch"); return; }
-                    if (!um.hasPermission(phone)) {
-                        log("requesting USB permission for " + phone.getDeviceName() + " (tap OK on the dialog)");
-                        requestPermission(um, phone);
-                        if (!um.hasPermission(phone)) { log("permission denied/timeout"); return; }
+                if (acc != null) { // left over from an earlier session: the phone may still be talking to a dead one, so reset the port first
+                    String old = acc.getDeviceName();
+                    if (!um.hasPermission(acc)) requestPermission(um, acc);
+                    int r = UsbTransport.reset(um, acc);
+                    log("accessory device already present (" + old + "), USB reset -> " + r);
+                    if (r < 0) UsbTransport.switchToAccessory(um, acc); // no native reset: ask for the accessory switch again
+                    acc = null;
+                    Thread.sleep(1500);
+                    for (int i = 0; i < 20 && acc == null; i++) { // wait for a NEW device name (or the phone back in normal mode)
+                        UsbDevice n = UsbTransport.findAccessory(um);
+                        if (n != null && !n.getDeviceName().equals(old)) acc = n;
+                        else if (UsbTransport.findPhone(um) != null) break;
+                        else Thread.sleep(500);
                     }
-                    log("switching " + phone.getDeviceName() + " to accessory mode");
-                    if (!UsbTransport.switchToAccessory(um, phone)) { log("RESULT 2b: FAIL not an AOA device"); return; }
-                    for (int i = 0; i < 6 && acc == null; i++) { Thread.sleep(500); acc = UsbTransport.findAccessory(um); }
-                    if (acc == null) { log("RESULT 2b: FAIL phone did not re-appear as accessory (18d1:2d0x)"); return; }
+                    if (acc == null && UsbTransport.findPhone(um) == null) acc = UsbTransport.findAccessory(um); // nothing changed: try the old one
+                }
+                if (acc == null) {
+                    boolean switched = false;
+                    for (UsbDevice cand : um.getDeviceList().values()) {
+                        if (!UsbTransport.isPhoneCandidate(cand)) continue; // not hubs, not the USB stick
+                        if (!um.hasPermission(cand)) {
+                            log("requesting USB permission for " + cand.getDeviceName() + " (tap OK on the dialog)");
+                            requestPermission(um, cand);
+                            if (!um.hasPermission(cand)) { log("permission denied/timeout for " + cand.getDeviceName()); continue; }
+                        }
+                        log("switching " + cand.getDeviceName() + " to accessory mode");
+                        if (UsbTransport.switchToAccessory(um, cand)) { switched = true; break; }
+                        log("not an AOA device, trying the next");
+                    }
+                    if (!switched) { log("RESULT 2b: FAIL no phone found that speaks AOA (plugged in? USB debugging prompt?)"); retryLater(); return; }
+                    for (int i = 0; i < 20 && acc == null; i++) { Thread.sleep(500); acc = UsbTransport.findAccessory(um); }
+                    if (acc == null) { log("RESULT 2b: FAIL phone did not re-appear as accessory (18d1:2d0x)"); retryLater(); return; }
                 }
                 log("accessory device: " + UsbTransport.describe(acc));
                 if (!um.hasPermission(acc)) { requestPermission(um, acc); }
@@ -180,10 +199,16 @@ public class MainActivity extends Activity {
             } catch (Throwable e) {
                 Log15.e("m2b", "usb link failed", e);
                 log("RESULT 2b: FAIL " + e);
+                retryLater();
             } finally {
                 connecting = false;
             }
         } }).start();
+    }
+
+    /** After a failed attempt that follows a link loss, try again a few times (the phone often re-appears a moment later). */
+    private void retryLater() {
+        if (reconnectTries > 0) runOnUiThread(new Runnable() { @Override public void run() { scheduleReconnect(); } });
     }
 
     private void requestPermission(UsbManager um, final UsbDevice d) throws InterruptedException {

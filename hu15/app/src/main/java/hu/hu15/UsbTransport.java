@@ -29,6 +29,28 @@ public final class UsbTransport implements Transport {
     private volatile boolean closed;
     private int readDeadlineMs = 15000;
 
+    static { try { System.loadLibrary("hu15n"); } catch (Throwable ignored) { } }
+    private static native int nReset(int fd);
+
+    /** A device that could be the phone: not a hub, not already an accessory, not mass storage (the unit's USB stick). */
+    public static boolean isPhoneCandidate(UsbDevice d) {
+        if (isAccessory(d) || d.getVendorId() == 0x1d6b || d.getDeviceClass() == 9) return false;
+        for (int i = 0; i < d.getInterfaceCount(); i++) if (d.getInterface(i).getInterfaceClass() == 8) return false;
+        return true;
+    }
+
+    public static UsbDevice findPhone(UsbManager m) {
+        for (UsbDevice d : m.getDeviceList().values()) if (isPhoneCandidate(d)) return d;
+        return null;
+    }
+
+    /** USBDEVFS_RESET: same as unplug+replug for the phone, which drops a stale accessory session. @return ioctl result, -1 on failure, -2 without the native library. */
+    public static int reset(UsbManager m, UsbDevice d) {
+        UsbDeviceConnection c = m.openDevice(d);
+        if (c == null) return -1;
+        try { return nReset(c.getFileDescriptor()); } catch (UnsatisfiedLinkError e) { return -2; } finally { c.close(); }
+    }
+
     /** True if the device is already in accessory mode (VID 18d1, PID 2d00..2d05). */
     public static boolean isAccessory(UsbDevice d) {
         return d.getVendorId() == GOOGLE_VID && d.getProductId() >= 0x2d00 && d.getProductId() <= 0x2d05;
