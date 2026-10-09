@@ -12,7 +12,10 @@ public final class H264Decoder {
 
     public static final int MAX_W = 1280, MAX_H = 720; // ponytail: 800x480 is all we announce; headroom only
     private long h;
-    public final ByteBuffer frame = ByteBuffer.allocateDirect(MAX_W * MAX_H * 3 / 2); // the latest decoded picture; the caller holds the view lock while decode() rewrites it
+    // two output buffers: the decoder writes one while the GL thread uploads the other, so decode and upload overlap (they used to take turns under one lock)
+    private final ByteBuffer[] bufs = { ByteBuffer.allocateDirect(MAX_W * MAX_H * 3 / 2), ByteBuffer.allocateDirect(MAX_W * MAX_H * 3 / 2) };
+    private int cur;
+    public volatile ByteBuffer frame = bufs[0]; // the latest decoded picture; stays valid until the decode after next
     public int width, height;
     private final int[] info = new int[2];
     public long decoded, failed;
@@ -22,12 +25,13 @@ public final class H264Decoder {
         if (h == 0) throw new IllegalStateException("openh264 init failed");
     }
 
-    /** @return true if frame/width/height hold a new picture. The result is in {@link #frame}. */
+    /** @return true if frame/width/height hold a new picture. The result is in {@link #frame}; it is not overwritten by the next decode. */
     public boolean decode(byte[] d, int off, int len) {
-        int r = nDecode(h, d, off, len, frame, frame.capacity(), info);
+        int r = nDecode(h, d, off, len, bufs[cur], bufs[cur].capacity(), info);
         if (r < 0) { failed++; return false; }
         if (r == 0) return false;
         width = info[0]; height = info[1]; decoded++;
+        frame = bufs[cur]; cur ^= 1;
         return true;
     }
 

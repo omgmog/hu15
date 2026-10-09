@@ -39,7 +39,7 @@ public final class Pipe implements Session.Sink {
         long t0 = System.nanoTime();
         if (frames == 0 && decodeNs == 0) Log15.i("video", "first decode call, " + len + " B");
         boolean got;
-        if (v != null) synchronized (v.lock()) { got = dec.decode(d, off, len); } else got = dec.decode(d, off, len);
+        got = dec.decode(d, off, len); // no view lock: the decoder alternates two buffers
         long dn = System.nanoTime() - t0;
         decodeNs += dn; if (dn > winMaxNs) winMaxNs = dn;
         if (!got) return;

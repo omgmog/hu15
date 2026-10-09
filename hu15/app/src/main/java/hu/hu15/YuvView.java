@@ -37,7 +37,7 @@ public final class YuvView extends GLSurfaceView implements GLSurfaceView.Render
         setRenderMode(RENDERMODE_WHEN_DIRTY);
     }
 
-    /** Held by the decoder while it rewrites the frame buffer, and by the GL thread while it uploads, so no half-written picture is drawn. */
+    /** Guards the pending-frame handover (not the decode itself: the decoder alternates two buffers). */
     public Object lock() { return lock; }
 
     public void frameReady(ByteBuffer frame, int w, int h) {
