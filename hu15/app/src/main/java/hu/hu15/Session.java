@@ -57,8 +57,10 @@ public final class Session implements Runnable {
     public void stop() { stop = true; }
 
     @Override public void run() {
-        ByteArrayOutputStream buf = new ByteArrayOutputStream(); // fragments of one message, first fragment resets it
-        int curType = -1;
+        // fragments of different channels interleave on the wire, so reassemble per channel (a global buffer dropped and mixed messages)
+        java.util.HashMap<Integer, ByteArrayOutputStream> bufs = new java.util.HashMap<Integer, ByteArrayOutputStream>();
+        java.util.HashMap<Integer, Integer> types = new java.util.HashMap<Integer, Integer>();
+        int reasmDrops = 0;
         Thread mon = new Thread(new Runnable() { @Override public void run() { // link health: log silent gaps so a stalled link can be told from a static screen
             long reported = 0;
             while (!stop) {
@@ -90,13 +92,19 @@ public final class Session implements Runnable {
                 AapLink.Frame f = link.readEncrypted();
                 rxWaitNs += System.nanoTime() - w0;
                 lastRxMs = System.currentTimeMillis();
-                if ((f.flags & 1) != 0) { buf.reset(); curType = f.type; lastRxCh = f.chan; lastRxType = f.type; }
+                ByteArrayOutputStream buf = bufs.get(f.chan);
+                if (buf == null) { buf = new ByteArrayOutputStream(); bufs.put(f.chan, buf); }
+                if ((f.flags & 1) != 0) {
+                    if (buf.size() > 0 && ++reasmDrops <= 5) Log15.i(TAG, "ch" + f.chan + ": new message started before the last one finished (" + buf.size() + " B dropped)");
+                    buf.reset(); types.put(f.chan, f.type); lastRxCh = f.chan; lastRxType = f.type;
+                }
                 buf.write(f.payload, 0, f.payload.length);
                 if ((f.flags & 2) != 0) {
                     byte[] p = buf.toByteArray();
                     buf.reset();
+                    Integer type = types.get(f.chan);
                     framesIn++;
-                    if (!dispatch(f.chan, curType, p)) { why = "bye-bye"; break; }
+                    if (type != null && !dispatch(f.chan, type, p)) { why = "bye-bye"; break; }
                 }
             }
         } catch (Throwable t) {
