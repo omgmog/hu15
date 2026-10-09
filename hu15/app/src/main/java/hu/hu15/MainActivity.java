@@ -65,6 +65,40 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** The unit has no file manager: copy hu15.log onto any writable removable mount (first one that takes it). */
+    private void exportLog() {
+        if (Log15.file == null) { log("no log file"); return; }
+        java.util.ArrayList<java.io.File> cand = new java.util.ArrayList<java.io.File>();
+        for (String root : new String[] {"/storage", "/mnt"}) {
+            java.io.File[] a = new java.io.File(root).listFiles();
+            if (a == null) continue;
+            for (java.io.File d : a) {
+                String n = d.getName().toLowerCase(java.util.Locale.US);
+                if (n.equals("sdcard") || n.equals("emulated") || n.equals("obb") || n.equals("asec") || n.equals("secure") || n.equals("shell") || n.equals("sdcard0")) continue;
+                cand.add(d);
+                java.io.File[] c = d.listFiles(); // usb mounts are sometimes one level down
+                if (c != null) for (java.io.File e : c) if (e.isDirectory()) cand.add(e);
+            }
+        }
+        String name = "hu15-" + new java.text.SimpleDateFormat("MMdd-HHmm", java.util.Locale.US).format(new java.util.Date()) + ".log";
+        for (java.io.File d : cand) {
+            if (!d.isDirectory() || !d.canWrite()) continue;
+            java.io.File f = new java.io.File(d, name);
+            try {
+                java.io.FileInputStream in = new java.io.FileInputStream(Log15.file);
+                java.io.FileOutputStream o = new java.io.FileOutputStream(f);
+                byte[] buf = new byte[16384]; int n;
+                while ((n = in.read(buf)) > 0) o.write(buf, 0, n);
+                o.getFD().sync(); o.close(); in.close();
+                log("log copied to " + f + " (" + f.length() + " B)");
+                return;
+            } catch (java.io.IOException ex) { log("failed " + f + ": " + ex.getMessage()); }
+        }
+        StringBuilder sb = new StringBuilder("no writable USB mount found. Looked at:");
+        for (java.io.File d : cand) sb.append(' ').append(d).append(d.canWrite() ? "(w)" : "(ro)");
+        log(sb.toString());
+    }
+
     /**
      * Phone-hotspot mode, no Bluetooth: join the phone's hotspot in Android's Wi-Fi settings, switch on Android Auto's
      * developer "Start head unit server" on the phone, then this connects to the hotspot gateway (= the phone) on :5277.
@@ -230,6 +264,7 @@ public class MainActivity extends Activity {
         button(root, "Connect USB phone", new Runnable() { public void run() { connectUsb(); } });
         button(root, "Phone hotspot", new Runnable() { public void run() { connectHotspot(); } });
         button(root, "Settings", new Runnable() { public void run() { startActivity(new Intent(MainActivity.this, SettingsActivity.class)); } });
+        button(root, "Copy log to USB stick", new Runnable() { public void run() { exportLog(); } });
         out = new TextView(this);
         out.setTextSize(11);
         out.setTypeface(android.graphics.Typeface.MONOSPACE);

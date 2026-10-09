@@ -80,3 +80,7 @@ USB: `UsbTransport` sends the AOA handshake (51 GET_PROTOCOL, 52 SEND_STRING x6,
 ## 2026-10-08 23:45 - After a read error or EOF (not a bye-bye), retry the USB connect up to 5 times, 3 s apart; the counter resets after a one-minute session. If the unit relaunches the app with no live session, the projection screen bounces to MainActivity and reconnects. scripts/serve.py serves APKs to the unit's browser.
 
 m4p. Link lost (read error or EOF, not a bye-bye from either side): retry the USB connect up to 5 times, 3 s apart, counter reset after a session that lasted a minute. The unit can relaunch an app in "last mode" with no live session; `ProjectionActivity` then hands over to `MainActivity` and reconnects. `scripts/serve.py` is a tiny upload/download HTTP server for moving APKs and logs to and from the unit's browser.
+
+## 2026-10-09 09:05 - The unit has no file manager and no adb. 'Copy log to USB stick' writes hu15.log to the first writable removable mount under /storage or /mnt.
+
+m4q. The first drive happened on m4p: audio fine; no skip buttons; the map video was heavily compressed during full-screen map updates; music and picture stopped after a couple of minutes. We could not get the log off the unit, which has no file picker, so there is now "Copy log to USB stick" (Advanced screen): it tries every removable-looking mount and writes `hu15-MMDD-HHMM.log` to the first one that takes it.

@@ -6,8 +6,8 @@ android {
         applicationId = "hu.hu15"
         minSdk = 15
         targetSdk = 15
-        versionCode = 19
-        versionName = "m4p"
+        versionCode = 20
+        versionName = "m4q"
         ndk { abiFilters += listOf("armeabi-v7a", "x86") } // x86 only for the emulator
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_1_8; targetCompatibility = JavaVersion.VERSION_1_8 }
