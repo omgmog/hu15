@@ -13,6 +13,10 @@ public final class Prefs {
 
     public static boolean get(Context c, String k) { return p(c).getBoolean(k, AUTO_USB.equals(k)); } // only auto-USB defaults on
     public static void set(Context c, String k, boolean v) { p(c).edit().putBoolean(k, v).commit(); }
+    /** Vendor id of the phone that last completed a session (-1 = none yet). USB gives no serial on API 15, so this is as precise as "paired" gets. */
+    public static int pairedVid(Context c) { return p(c).getInt("paired_vid", -1); }
+    public static void setPaired(Context c, int vid) { p(c).edit().putInt("paired_vid", vid).commit(); }
+
 
     public static int night(Context c) { return p(c).getInt(NIGHT, NIGHT_AUTO); }
     public static void setNight(Context c, int v) { p(c).edit().putInt(NIGHT, v).commit(); }

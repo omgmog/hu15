@@ -24,7 +24,7 @@ import java.util.Arrays;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
-/** Debug screen: self-test, connect over TCP or USB, settings. */
+/** Main screen: Pair / Advanced, and the connection logic behind them. */
 public class MainActivity extends Activity {
     private TextView out;
 
@@ -40,7 +40,7 @@ public class MainActivity extends Activity {
         if (tcpHost != null) connectTcp(tcpHost, 5277);
         boolean auto = Prefs.get(this, Prefs.AUTO_USB);
         // Connect when asked (extra), when a USB device was plugged in, when the unit relaunched us, or simply on start (auto-connect on).
-        if (getIntent().hasExtra("usb") || (auto && tcpHost == null && Pipe.current == null)) connectUsb(); // am start ... --es usb 1
+        if (getIntent().hasExtra("usb") || (auto && paired() && tcpHost == null && Pipe.current == null)) connectUsb(); // am start ... --es usb 1
     }
 
     private void say(String s) { Log15.i("selftest", s); out.append(s + "\n"); }
@@ -132,10 +132,13 @@ public class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent i) {
         super.onNewIntent(i);
         setIntent(i);
-        if ((UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(i.getAction()) || i.hasExtra("reconnect")) && Prefs.get(this, Prefs.AUTO_USB) && Pipe.current == null) connectUsb();
+        if ((UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(i.getAction()) || i.hasExtra("reconnect")) && Prefs.get(this, Prefs.AUTO_USB) && paired() && Pipe.current == null) connectUsb();
+        refreshMenu();
     }
 
     private static volatile boolean connecting;
+    private static final int GOOGLE_VID = 0x18d1;
+    private volatile int pendingPairVid = -1;
     private static int reconnectTries;                               // consecutive link losses; reset after a session that lasted a minute
     private final android.os.Handler handler = new android.os.Handler();
 
@@ -157,6 +160,8 @@ public class MainActivity extends Activity {
                 log("USB devices: " + devs.size());
                 for (UsbDevice d : devs.values()) log("  " + UsbTransport.describe(d));
                 UsbDevice acc = UsbTransport.findAccessory(um);
+                pendingPairVid = -1;
+                setStatus("Looking for your phone…");
                 if (acc != null) { // left over from an earlier session: the phone may still be talking to a dead one, so reset the port first
                     String old = acc.getDeviceName();
                     if (!um.hasPermission(acc)) requestPermission(um, acc);
@@ -183,13 +188,14 @@ public class MainActivity extends Activity {
                             if (!um.hasPermission(cand)) { log("permission denied/timeout for " + cand.getDeviceName()); continue; }
                         }
                         log("switching " + cand.getDeviceName() + " to accessory mode");
-                        if (UsbTransport.switchToAccessory(um, cand)) { switched = true; break; }
+                        if (UsbTransport.switchToAccessory(um, cand)) { switched = true; pendingPairVid = cand.getVendorId(); break; }
                         log("not an AOA device, trying the next");
                     }
-                    if (!switched) { log("RESULT 2b: FAIL no phone found that speaks AOA (plugged in? USB debugging prompt?)"); retryLater(); return; }
+                    if (!switched) { log("RESULT 2b: FAIL no phone found that speaks AOA (plugged in? USB debugging prompt?)"); setStatus("No phone found. Plug it in with a data cable and unlock it."); retryLater(); return; }
                     for (int i = 0; i < 20 && acc == null; i++) { Thread.sleep(500); acc = UsbTransport.findAccessory(um); }
                     if (acc == null) { log("RESULT 2b: FAIL phone did not re-appear as accessory (18d1:2d0x)"); retryLater(); return; }
                 }
+                if (pendingPairVid < 0) pendingPairVid = Prefs.pairedVid(MainActivity.this) >= 0 ? Prefs.pairedVid(MainActivity.this) : GOOGLE_VID; // already in accessory mode: keep the known phone, else Google's id
                 log("accessory device: " + UsbTransport.describe(acc));
                 if (!um.hasPermission(acc)) { requestPermission(um, acc); }
                 if (!um.hasPermission(acc)) { log("RESULT 2b: FAIL no permission for accessory device"); return; }
@@ -202,6 +208,7 @@ public class MainActivity extends Activity {
                 retryLater();
             } finally {
                 connecting = false;
+                runOnUiThread(new Runnable() { @Override public void run() { refreshMenu(); } });
             }
         } }).start();
     }
@@ -227,6 +234,7 @@ public class MainActivity extends Activity {
         AapLink link = new AapLink(this, t);
         link.connect();
         log("TLS up; session running");
+        if (pendingPairVid >= 0 && t instanceof UsbTransport) { Prefs.setPaired(this, pendingPairVid); setStatus("Connected"); }
         if (t instanceof TcpTransport) ((TcpTransport) t).setReadTimeoutMs(0);          // phone pings regularly in real use; tests may idle
         if (t instanceof UsbTransport) ((UsbTransport) t).setReadDeadlineMs(60000);
         Pipe pipe = new Pipe(Prefs.get(this, Prefs.THREADS2) ? 2 : 1);
@@ -270,40 +278,152 @@ public class MainActivity extends Activity {
         runOnUiThread(new Runnable() { @Override public void run() { out.append(s + "\n"); } });
     }
 
-    // ---- UI: a column of buttons and a log ----
+    // ---- UI: a two-button menu (Pair / Advanced) and the Advanced screen with all the debug tools ----
+
+    private android.widget.FrameLayout frame;
+    private View menuView, advView;
+    private LinearLayout primaryBtn;
+    private TextView status;
+
+    private void setStatus(final String s) {
+        runOnUiThread(new Runnable() { @Override public void run() { if (status != null) status.setText(s); } });
+    }
+
+    private boolean paired() { return Prefs.pairedVid(this) >= 0; }
+
+    /** Pair vs. launch: "paired" = a phone with this vendor id completed a session here before (USB gives no serial on API 15). */
+    private void refreshMenu() {
+        if (primaryBtn == null) return;
+        UsbManager um = (UsbManager) getSystemService(USB_SERVICE);
+        UsbDevice acc = UsbTransport.findAccessory(um), ph = UsbTransport.findPhone(um);
+        boolean connected = acc != null || ph != null;
+        boolean known = connected && paired() && (acc != null || ph.getVendorId() == Prefs.pairedVid(this));
+        if (Pipe.current != null) { Ui.setBigButton(primaryBtn, "Android Auto", "Running. Tap to return to the screen"); }
+        else if (known) { Ui.setBigButton(primaryBtn, "Start Android Auto", "Your phone is connected"); status.setText("Ready"); }
+        else if (connected) { Ui.setBigButton(primaryBtn, "Pair phone", "Phone detected. Tap to set it up"); status.setText("Unlock the phone and accept the Android Auto prompt"); }
+        else { Ui.setBigButton(primaryBtn, "Pair phone", "Plug in your phone with a USB cable"); status.setText(paired() ? "Waiting for your phone" : "Not paired yet"); }
+    }
+
+    private void show(boolean advanced) {
+        menuView.setVisibility(advanced ? View.GONE : View.VISIBLE);
+        advView.setVisibility(advanced ? View.VISIBLE : View.GONE);
+    }
+
+    @Override protected void onResume() { super.onResume(); refreshMenu(); }
+
+    @Override public void onBackPressed() {
+        if (advView != null && advView.getVisibility() == View.VISIBLE) show(false); else super.onBackPressed();
+    }
+
+    private LinearLayout.LayoutParams weight(float w) { return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, w); }
 
     private void buildUi() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(12, 12, 12, 12);
-        button(root, "Run self-test", new Runnable() { public void run() { selfTest(); } });
+        frame = new android.widget.FrameLayout(this);
+        frame.setBackgroundColor(Ui.BG);
+
+        // --- menu: logo on the left, the two buttons on the right ---
+        LinearLayout menu = new LinearLayout(this);
+        menu.setOrientation(LinearLayout.HORIZONTAL);
+        menu.setPadding(Ui.dp(this, 32), Ui.dp(this, 24), Ui.dp(this, 32), Ui.dp(this, 24));
+        LinearLayout brand = new LinearLayout(this);
+        brand.setOrientation(LinearLayout.VERTICAL);
+        brand.setGravity(android.view.Gravity.CENTER);
+        android.widget.ImageView logo = new android.widget.ImageView(this);
+        logo.setImageResource(R.drawable.aa_logo);
+        brand.addView(logo, new LinearLayout.LayoutParams(Ui.dp(this, 150), Ui.dp(this, 153)));
+        TextView name = Ui.text(this, "HU15", 30, Ui.TEXT, true);
+        name.setPadding(0, Ui.dp(this, 14), 0, 0);
+        name.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        brand.addView(name, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        TextView ver = Ui.text(this, versionName(), 13, Ui.TEXT2, false);
+        ver.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        brand.addView(ver, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        menu.addView(brand, weight(1f));
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.VERTICAL);
+        actions.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        primaryBtn = Ui.bigButton(this, "Pair phone", "", true);
+        primaryBtn.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) {
+            if (Pipe.current != null) startActivity(new Intent(MainActivity.this, ProjectionActivity.class)); else connectUsb();
+        } });
+        actions.addView(primaryBtn, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 120)));
+        LinearLayout adv = Ui.bigButton(this, "Advanced", "Connection tools, settings and logs", false);
+        adv.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { show(true); } });
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 84));
+        alp.topMargin = Ui.dp(this, 14);
+        actions.addView(adv, alp);
+        status = Ui.text(this, "", 14, Ui.TEXT2, false);
+        status.setPadding(Ui.dp(this, 6), Ui.dp(this, 16), 0, 0);
+        actions.addView(status);
+        menu.addView(actions, weight(1.15f));
+        menuView = menu;
+
+        // --- advanced: header with a back chevron, tools on the left, log card on the right ---
+        LinearLayout advRoot = new LinearLayout(this);
+        advRoot.setOrientation(LinearLayout.VERTICAL);
+        advRoot.setPadding(Ui.dp(this, 20), Ui.dp(this, 12), Ui.dp(this, 20), Ui.dp(this, 12));
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        TextView back = Ui.text(this, "‹  Advanced", 22, Ui.TEXT, true);
+        back.setPadding(Ui.dp(this, 14), Ui.dp(this, 8), Ui.dp(this, 22), Ui.dp(this, 8));
+        back.setClickable(true);
+        back.setFocusable(true);
+        back.setBackgroundDrawable(Ui.pressable(this, Ui.BG, Ui.CARD_HI, 12, 0));
+        back.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { show(false); } });
+        head.addView(back);
+        advRoot.addView(head, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 52)));
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(0, Ui.dp(this, 6), Ui.dp(this, 14), 0);
+        list.addView(tool("Connect USB phone", "Switch the phone to accessory mode and start", new Runnable() { public void run() { connectUsb(); } }));
+        list.addView(tool("Run self-test", "Check that TLS 1.2 is available on this unit", new Runnable() { public void run() { selfTest(); } }));
         final android.widget.EditText host = new android.widget.EditText(this);
         host.setSingleLine(true);
+        host.setTextColor(Ui.TEXT);
+        host.setHintTextColor(Ui.TEXT2);
+        host.setBackgroundDrawable(Ui.shape(this, Ui.CARD, 12, Ui.OUTLINE));
+        host.setPadding(Ui.dp(this, 14), Ui.dp(this, 8), Ui.dp(this, 14), Ui.dp(this, 8));
         host.setText(getSharedPreferences("hu15", MODE_PRIVATE).getString("tcp_host", "10.0.2.2")); // 10.0.2.2 = the emulator's host
-        root.addView(host);
-        button(root, "Connect TCP :5277", new Runnable() { public void run() {
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        hlp.bottomMargin = Ui.dp(this, 8);
+        list.addView(host, hlp);
+        list.addView(tool("Connect TCP :5277", "Fake phone or a head-unit server on that host", new Runnable() { public void run() {
             String h = host.getText().toString().trim();
             getSharedPreferences("hu15", MODE_PRIVATE).edit().putString("tcp_host", h).commit();
             connectTcp(h, 5277);
-        } });
-        button(root, "Connect USB phone", new Runnable() { public void run() { connectUsb(); } });
-        button(root, "Phone hotspot", new Runnable() { public void run() { connectHotspot(); } });
-        button(root, "Settings", new Runnable() { public void run() { startActivity(new Intent(MainActivity.this, SettingsActivity.class)); } });
-        button(root, "Copy log to USB stick", new Runnable() { public void run() { exportLog(); } });
+        } }));
+        list.addView(tool("Phone hotspot", "Connect to the Wi-Fi gateway (the phone)", new Runnable() { public void run() { connectHotspot(); } }));
+        list.addView(tool("Settings", "Mic, Bluetooth, night mode, navigation bar", new Runnable() { public void run() { startActivity(new Intent(MainActivity.this, SettingsActivity.class)); } }));
+        list.addView(tool("Copy log to USB stick", "Writes hu15.log to the first writable stick", new Runnable() { public void run() { exportLog(); } }));
+        list.addView(tool("Forget paired phone", "The next connection will ask to pair again", new Runnable() { public void run() { Prefs.setPaired(MainActivity.this, -1); refreshMenu(); log("forgot paired phone"); } }));
+        ScrollView lsv = new ScrollView(this);
+        lsv.addView(list);
+        body.addView(lsv, weight(1f));
         out = new TextView(this);
         out.setTextSize(11);
+        out.setTextColor(Ui.TEXT2);
         out.setTypeface(android.graphics.Typeface.MONOSPACE);
-        root.addView(out);
+        out.setPadding(Ui.dp(this, 12), Ui.dp(this, 10), Ui.dp(this, 12), Ui.dp(this, 10));
         ScrollView sv = new ScrollView(this);
-        sv.addView(root);
-        setContentView(sv);
+        sv.setBackgroundDrawable(Ui.shape(this, Ui.CARD, 14, Ui.OUTLINE));
+        sv.addView(out);
+        body.addView(sv, weight(1f));
+        advRoot.addView(body, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        advView = advRoot;
+        advView.setVisibility(View.GONE);
+
+        frame.addView(menuView);
+        frame.addView(advView);
+        setContentView(frame);
     }
 
-    private void button(LinearLayout root, String label, final Runnable r) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { r.run(); } });
-        root.addView(b);
+    private View tool(String title, String sub, final Runnable r) {
+        LinearLayout row = Ui.row(this, title, sub);
+        row.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { r.run(); } });
+        return row;
     }
 
     private String versionName() {

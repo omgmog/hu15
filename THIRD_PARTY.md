@@ -11,4 +11,5 @@ Bundled / linked:
   Cisco's patent licence covers only Cisco's own binaries; a self-built H.264 decoder has no patent cover. Personal use here; check before distributing.
 - NDK r17c libc++ (Apache-2.0 with LLVM exception).
 - OpenDroidAuto (MaKi983, GPL-3.0): the two AIDL interface files for Honda's steering-menu service (hu15/app/src/main/aidl/...) are copied from it. GPL-3.0 code can be combined into an AGPL-3.0 work.
+- Android Auto logo (hu15/Android_Auto_icon.svg; the splash screen and launcher icon): from Wikimedia Commons, public-domain artwork of a Google trademark. Not endorsed by Google.
 Not used: HeadUnit Revived's code, gartnera/headunit (AGPL C++), FFmpeg.

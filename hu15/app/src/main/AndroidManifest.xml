@@ -10,17 +10,19 @@
     <uses-feature android:name="android.hardware.usb.accessory" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-permission android:name="android.permission.ADA_SERVICE_ACCESS" />
-    <application android:label="HU15" android:theme="@android:style/Theme.Holo.NoActionBar" android:allowBackup="false">
+    <application android:label="HU15" android:icon="@drawable/ic_launcher" android:theme="@android:style/Theme.Holo.NoActionBar" android:allowBackup="false">
+        <activity android:name=".SplashActivity" android:exported="true" android:screenOrientation="landscape" android:theme="@android:style/Theme.Holo.NoActionBar.Fullscreen">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <activity android:name=".ProjectionActivity" android:screenOrientation="landscape" android:configChanges="orientation|keyboardHidden|screenSize" android:launchMode="singleTask" />
         <receiver android:name=".MediaButtonReceiver" android:exported="true">
             <intent-filter android:priority="1000"><action android:name="android.intent.action.MEDIA_BUTTON" /></intent-filter>
         </receiver>
         <activity android:name=".SettingsActivity" android:screenOrientation="landscape" />
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:screenOrientation="landscape">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
