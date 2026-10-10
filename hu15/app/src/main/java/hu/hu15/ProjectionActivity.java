@@ -111,7 +111,7 @@ public class ProjectionActivity extends Activity {
         if (code == -65532) code = KeyEvent.KEYCODE_MEDIA_PREVIOUS;
         else if (code == -65533) code = KeyEvent.KEYCODE_MEDIA_NEXT;
         else if (code == -65531) code = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
-
+        else if (code == -65522) code = KeyEvent.KEYCODE_SEARCH; // voice button (seen once on the drive of 2026-10-10); Android Auto starts the assistant on SEARCH. -65526 is still unidentified
         switch (code) {
             case KeyEvent.KEYCODE_BACK: case KeyEvent.KEYCODE_DPAD_UP: case KeyEvent.KEYCODE_DPAD_DOWN: case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT: case KeyEvent.KEYCODE_DPAD_CENTER: case KeyEvent.KEYCODE_ENTER:
