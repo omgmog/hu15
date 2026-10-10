@@ -107,12 +107,10 @@ public class ProjectionActivity extends Activity {
             }
             return true;
         }
-        // Honda wheel keys arrive as odd negative codes (same ones OpenDroidAuto maps): left/right = previous/next, source = play/pause (+/- = up/down)
+        // Honda wheel keys arrive as odd negative codes (same ones OpenDroidAuto maps): left/right = previous/next, source = play/pause (+/- are volume, see onKeyDown)
         if (code == -65532) code = KeyEvent.KEYCODE_MEDIA_PREVIOUS;
         else if (code == -65533) code = KeyEvent.KEYCODE_MEDIA_NEXT;
         else if (code == -65531) code = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
-        else if (code == -65535) code = KeyEvent.KEYCODE_DPAD_UP;
-        else if (code == -65534) code = KeyEvent.KEYCODE_DPAD_DOWN;
 
         switch (code) {
             case KeyEvent.KEYCODE_BACK: case KeyEvent.KEYCODE_DPAD_UP: case KeyEvent.KEYCODE_DPAD_DOWN: case KeyEvent.KEYCODE_DPAD_LEFT:
@@ -126,10 +124,25 @@ public class ProjectionActivity extends Activity {
         }
     }
 
+    private static boolean wheelVolume(int code) { return code == -65535 || code == -65534; } // wheel + / -
+    private int volLogged;
+
+    /** Our steering-menu registration takes the wheel's volume keys too, so hand them back to the unit's own volume (ModeMgrService, what OpenDroidAuto calls), else Android's. */
+    private void volume(boolean up) {
+        if (volLogged++ < 3) Log15.i("wheel", "volume " + (up ? "up" : "down") + " via " + (getSystemService("ModeMgrService") != null ? "ModeMgrService" : "AudioManager"));
+        try {
+            Object m = getSystemService("ModeMgrService");
+            if (m != null) { m.getClass().getMethod("reqModeMgrSteeringVolCmd", boolean.class).invoke(m, up); return; }
+        } catch (Throwable t) { if (volLogged < 6) Log15.e("wheel", "ModeMgrService volume", t); }
+        ((android.media.AudioManager) getSystemService(AUDIO_SERVICE)).adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                up ? android.media.AudioManager.ADJUST_RAISE : android.media.AudioManager.ADJUST_LOWER, android.media.AudioManager.FLAG_SHOW_UI);
+    }
+
     @Override public boolean onKeyDown(int code, KeyEvent e) {
+        if (wheelVolume(code)) { volume(code == -65535); return true; } // repeats allowed: hold to ramp
         return e.getRepeatCount() == 0 && key(code, true) || super.onKeyDown(code, e);
     }
-    @Override public boolean onKeyUp(int code, KeyEvent e) { return key(code, false) || super.onKeyUp(code, e); }
+    @Override public boolean onKeyUp(int code, KeyEvent e) { return wheelVolume(code) || key(code, false) || super.onKeyUp(code, e); }
 
     @Override protected void onResume() { super.onResume(); if (view == null) return; Pipe p = Pipe.current; if (p != null) p.attach(view); else Pipe.view = view; view.onResume();
         if (wheel == null) wheel = new WheelKeys(this);
