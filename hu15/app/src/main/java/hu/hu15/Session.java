@@ -237,19 +237,24 @@ public final class Session implements Runnable {
                 if (!open) { stopMic(); send(CH_MIC, 0x8006, new Pb().varint(1, 0).varint(2, micId).build()); return true; }
                 if (!cfg.mic) { Log15.i(TAG, "mic requested but disabled in settings"); send(CH_MIC, 0x8006, new Pb().varint(1, -7).varint(2, micId).build()); return true; }
                 stopMic();
+                Log15.i(TAG, "mic requested, opening");
                 micWindow = (int) Math.max(1, Math.min(16, Pb.getVarint(p, 4, 2)));
                 micUnacked.set(0);
-                try {
-                    mic = new MicCapture(new MicCapture.Callback() { @Override public void chunk(byte[] pcm) { micChunk(pcm); } });
-                    micId++;
-                    send(CH_MIC, 0x8006, new Pb().varint(1, 0).varint(2, micId).build()); // response before the first data, as HUR does
-                    mic.start();
-                    Log15.i(TAG, "mic open session=" + micId + " window=" + micWindow);
-                } catch (Throwable t) {
-                    Log15.e(TAG, "mic start", t);
-                    mic = null;
-                    send(CH_MIC, 0x8006, new Pb().varint(1, -7).varint(2, micId).build());
-                }
+                // On a worker thread: AudioRecord can block for good on the Honda unit, and it must never stall the read loop (a stalled loop = dead link; seen on "ok Google" with the unit mic enabled).
+                new Thread(new Runnable() { @Override public void run() {
+                    try {
+                        MicCapture m = new MicCapture(new MicCapture.Callback() { @Override public void chunk(byte[] pcm) { micChunk(pcm); } });
+                        micId++;
+                        send(CH_MIC, 0x8006, new Pb().varint(1, 0).varint(2, micId).build()); // response before the first data, as HUR does
+                        mic = m;
+                        m.start();
+                        Log15.i(TAG, "mic open session=" + micId + " window=" + micWindow);
+                    } catch (Throwable t) {
+                        Log15.e(TAG, "mic start", t);
+                        mic = null;
+                        try { send(CH_MIC, 0x8006, new Pb().varint(1, -7).varint(2, micId).build()); } catch (Throwable ignored) { }
+                    }
+                } }, "mic-open").start();
                 return true;
             }
             case 0x8004: // Ack from phone
