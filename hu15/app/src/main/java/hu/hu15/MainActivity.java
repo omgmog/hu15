@@ -405,6 +405,7 @@ public class MainActivity extends Activity {
         } }));
         list.addView(tool("Phone hotspot", "Connect to the Wi-Fi gateway (the phone)", new Runnable() { public void run() { connectHotspot(); } }));
         list.addView(tool("Settings", "Mic, Bluetooth, night mode, navigation bar", new Runnable() { public void run() { startActivity(new Intent(MainActivity.this, SettingsActivity.class)); } }));
+        list.addView(tool("Key tester", "Shows the code of every wheel and unit key you press", new Runnable() { public void run() { startActivity(new Intent(MainActivity.this, KeyTestActivity.class)); } }));
         list.addView(tool("Copy log to USB stick", "Writes hu15.log to the first writable stick", new Runnable() { public void run() { exportLog(); } }));
         list.addView(tool("Forget paired phone", "The next connection will ask to pair again", new Runnable() { public void run() { Prefs.setPaired(MainActivity.this, -1); refreshMenu(); log("forgot paired phone"); } }));
         ScrollView lsv = new ScrollView(this);

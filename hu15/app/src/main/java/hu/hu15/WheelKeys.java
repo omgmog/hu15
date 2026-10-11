@@ -21,9 +21,9 @@ final class WheelKeys {
     private boolean bound;
     private int shown, announced;
     private final ISteeringMenuServiceCallback cb = new ISteeringMenuServiceCallback.Stub() {
-        @Override public boolean onFinishView(boolean a, boolean b) { Log15.i("wheel", "onFinishView " + a + " " + b); return true; }
+        @Override public boolean onFinishView(boolean a, boolean b) { Log15.i("wheel", "onFinishView " + a + " " + b); tell("service: onFinishView " + a + " " + b); return true; }
         @Override public void onShowView() { if (shown++ < 3) Log15.i("wheel", "onShowView (further ones not logged)"); announce(1); }
-        @Override public boolean onSteeringSWDown(int type) { Log15.i("wheel", "onSteeringSWDown " + type); return true; }
+        @Override public boolean onSteeringSWDown(int type) { Log15.i("wheel", "onSteeringSWDown " + type); tell("service: onSteeringSWDown " + type); return true; }
     };
     private final ServiceConnection conn = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName n, IBinder b) {
@@ -34,6 +34,11 @@ final class WheelKeys {
         }
         @Override public void onServiceDisconnected(ComponentName n) { Log15.i("wheel", "service disconnected"); svc = null; }
     };
+
+    /** Key tester hook: gets the steering service's own callbacks as text lines. */
+    interface Listener { void line(String s); }
+    static volatile Listener listener;
+    private static void tell(String s) { Listener l = listener; if (l != null) l.line(s); }
 
     WheelKeys(Context c) { ctx = c; }
 

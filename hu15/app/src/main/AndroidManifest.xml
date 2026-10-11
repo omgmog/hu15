@@ -22,6 +22,7 @@
             <intent-filter android:priority="1000"><action android:name="android.intent.action.MEDIA_BUTTON" /></intent-filter>
         </receiver>
         <activity android:name=".SettingsActivity" android:screenOrientation="landscape" />
+        <activity android:name=".KeyTestActivity" android:screenOrientation="landscape" />
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
