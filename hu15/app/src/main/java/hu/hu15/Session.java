@@ -81,6 +81,12 @@ public final class Session implements Runnable {
                 catch (InterruptedException e) { return; } catch (Throwable t) { return; }
                 long silent = System.currentTimeMillis() - lastPongMs;
                 if (silent > 8000 && pingsSent % 5 == 0) Log15.i(TAG, "no ping reply for " + silent / 1000 + " s (sent " + pingsSent + ", answered " + pongs + ")");
+                if (silent > 15000) { // dead phone/link: say bye so the phone drops its session (else a replug resumes the frozen one), end ours and let the app reconnect
+                    Log15.i(TAG, "no ping reply for " + silent / 1000 + " s: ending the session");
+                    linkLost = true;
+                    byeBye();
+                    return;
+                }
             }
         } }, "pinger");
         pinger.setDaemon(true);
