@@ -237,7 +237,7 @@ public class MainActivity extends Activity {
         if (pendingPairVid >= 0 && t instanceof UsbTransport) { Prefs.setPaired(this, pendingPairVid); setStatus("Connected"); }
         if (t instanceof TcpTransport) ((TcpTransport) t).setReadTimeoutMs(0);          // phone pings regularly in real use; tests may idle
         if (t instanceof UsbTransport) ((UsbTransport) t).setReadDeadlineMs(60000);
-        Pipe pipe = new Pipe(Prefs.get(this, Prefs.THREADS2) ? 2 : 1);
+        Pipe pipe = new Pipe(Prefs.get(this, Prefs.THREADS2) ? 2 : 1, Prefs.astream(this));
         Session.Config cfg = new Session.Config();
         cfg.mic = Prefs.get(this, Prefs.MIC);
         cfg.rhd = Prefs.get(this, Prefs.RHD);
@@ -257,11 +257,19 @@ public class MainActivity extends Activity {
         android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) getSystemService(WIFI_SERVICE);
         android.net.wifi.WifiManager.WifiLock wl = wm == null ? null : wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "hu15");
         android.os.PowerManager.WakeLock cl = ((android.os.PowerManager) getSystemService(POWER_SERVICE)).newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "hu15");
+        final android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+        final android.media.AudioManager.OnAudioFocusChangeListener focus = new android.media.AudioManager.OnAudioFocusChangeListener() {
+            @Override public void onAudioFocusChange(int c) { Log15.i("audio", "focus change " + c); }
+        };
         try {
             if (wl != null) wl.acquire();
             cl.acquire();
+            am.requestAudioFocus(focus, android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.AUDIOFOCUS_GAIN); // tell the unit's audio manager we own the music stream, and hand it back below
+            if (Prefs.astream(this) == 2) HondaAudio.request(this);
             session.run();
         } finally {
+            am.abandonAudioFocus(focus);
+            HondaAudio.release(this);
             if (wl != null && wl.isHeld()) wl.release();
             if (cl.isHeld()) cl.release();
         }

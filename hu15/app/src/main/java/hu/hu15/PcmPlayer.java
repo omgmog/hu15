@@ -43,7 +43,7 @@ public final class PcmPlayer implements Runnable {
     public void release() {
         stop = true;
         th.interrupt();
-        try { track.stop(); } catch (IllegalStateException ignored) { }
+        try { track.pause(); track.flush(); track.stop(); } catch (IllegalStateException ignored) { }
         track.release();
     }
 }

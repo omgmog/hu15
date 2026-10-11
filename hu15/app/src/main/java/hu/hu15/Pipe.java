@@ -11,9 +11,9 @@ public final class Pipe implements Session.Sink {
     public volatile Session session;
 
     private H264Decoder dec;
-    private final int threads;
+    private final int threads, astream;
 
-    public Pipe(int threads) { this.threads = threads; }
+    public Pipe(int threads, int astream) { this.threads = threads; this.astream = astream; }
     private final SparseArray<PcmPlayer> players = new SparseArray<PcmPlayer>();
     private long frames, firstMs, lastLogMs, decodeNs, winFrames, winMaxNs, winBytes, lastFrameMs, winMaxGapMs;
     public volatile String stats = "";
@@ -64,8 +64,8 @@ public final class Pipe implements Session.Sink {
     @Override public synchronized void audioStart(int chan, int rate, int bits, int channels) {
         PcmPlayer p = players.get(chan);
         if (p != null) p.release();
-        players.put(chan, new PcmPlayer(android.media.AudioManager.STREAM_MUSIC, rate, channels));
-        Log15.i("audio", "start ch" + chan);
+        players.put(chan, new PcmPlayer(astream == 0 ? android.media.AudioManager.STREAM_MUSIC : astream == 1 ? android.media.AudioManager.STREAM_SYSTEM : chan == Session.CH_AUD ? 11 : 15, rate, channels));
+        Log15.i("audio", "start ch" + chan + " stream mode " + astream);
     }
 
     @Override public void audioPcm(int chan, byte[] d, int off, int len) {

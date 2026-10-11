@@ -41,6 +41,22 @@ public class SettingsActivity extends Activity {
             @Override public void onCheckedChanged(RadioGroup group, int id) { Prefs.setNight(SettingsActivity.this, id - 100); }
         });
         l.addView(g);
+        TextView t2 = new TextView(this);
+        t2.setText("Audio output (restart the connection to apply)");
+        l.addView(t2);
+        RadioGroup g2 = new RadioGroup(this);
+        String[] anames = {"Music stream", "System stream (default; what OpenDroidAuto uses with THIRD PARTY)", "Honda streams + audio handoff (needs PREINSTALL in Honda Permissions)"};
+        for (int i = 0; i < anames.length; i++) {
+            RadioButton r = new RadioButton(this);
+            r.setText(anames[i]);
+            r.setId(200 + i);
+            g2.addView(r);
+        }
+        g2.check(200 + Prefs.astream(this));
+        g2.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(RadioGroup group, int id) { Prefs.setAstream(SettingsActivity.this, id - 200); }
+        });
+        l.addView(g2);
         ScrollView sv = new ScrollView(this);
         sv.addView(l);
         setContentView(sv);

@@ -17,6 +17,9 @@ public final class Prefs {
     public static int pairedVid(Context c) { return p(c).getInt("paired_vid", -1); }
     public static void setPaired(Context c, int vid) { p(c).edit().putInt("paired_vid", vid).commit(); }
 
+    /** Audio stream for the AudioTracks: 0 = STREAM_MUSIC, 1 = STREAM_SYSTEM (what OpenDroidAuto gets for 3rd-party apps), 2 = Honda streams 11/15 plus ModeMgr handoff (PREINSTALL permission). */
+    public static int astream(Context c) { return p(c).getInt("astream", 1); }
+    public static void setAstream(Context c, int v) { p(c).edit().putInt("astream", v).commit(); }
 
     public static int night(Context c) { return p(c).getInt(NIGHT, NIGHT_AUTO); }
     public static void setNight(Context c, int v) { p(c).edit().putInt(NIGHT, v).commit(); }
