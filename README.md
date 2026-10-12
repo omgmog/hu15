@@ -4,6 +4,11 @@ Android Auto receiver for Android 4.0.4 (API 15) head units, built for the Honda
 
 It runs where there is no MediaCodec, no AppCompat and TLS only goes up to 1.0 (Tegra 3, 800x480), and has run a 21-minute session at about 29 fps with no drops.
 
+<p>
+  <img src="docs/screens/menu.png" width="400" alt="The hu15 menu with a Pair phone button and an Advanced button">
+  <img src="docs/screens/advanced.png" width="400" alt="The Advanced page with connection tools on the left and a log on the right">
+</p>
+
 - **Video:** OpenH264 software decode (JNI) to a GLES2 YUV shader.
 - **Transport:** USB Android Open Accessory, or TCP (fake phone, Wi-Fi).
 - **TLS:** Conscrypt `SSLEngine` for TLS 1.2.
